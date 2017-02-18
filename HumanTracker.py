@@ -8,15 +8,20 @@ import os
 
 localtime = time.localtime()
 timeString = time.strftime("%Y%m%d%H%M%S", localtime)
-myfile = open("data" + timeString + ".csv", 'wb')
-wr = csv.writer(myfile, delimiter='|', quoting=csv.QUOTE_ALL)
+
 old_found_filtered = []
 found_speed = []
 
 cam_distance = 10
 width = 640
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+directory = './' + timeString + '/'
+
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+myfile = open(directory + "data.csv", 'wb')
+wr = csv.writer(myfile, delimiter='|', quoting=csv.QUOTE_ALL)
 
 
 def calculate_speed(old_found_filtered, found_filtered, timestemp):
@@ -79,6 +84,11 @@ def inside(r, q):
     return rx > qx and ry > qy and rx + rw < qx + qw and ry + rh < qy + qh
 
 
+def get_file_name():
+    localtime = time.localtime()
+    return directory + time.strftime("%Y%m%d%H%M%S", localtime) + '.jpg'
+
+
 cap = cv2.VideoCapture(0)
 hog = cv2.HOGDescriptor()
 hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
@@ -88,7 +98,7 @@ while (True):
     # Capture frame-by-frame
     ret, frame = cap.read()
 
-    ret = cv2.GaussianBlur(ret, (3, 3), -1)
+    frame = cv2.GaussianBlur(frame, (3, 3), -1)
 
     # Our operations on the frame come here
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -101,8 +111,8 @@ while (True):
                 break
         else:
             found_filtered.append(r)
-    draw_detections(gray, found)
-    draw_detections(gray, found_filtered, 3)
+    draw_detections(frame, found)
+    draw_detections(frame, found_filtered, 3)
 
     current_time = time.time()
 
@@ -110,11 +120,11 @@ while (True):
         calculate_speed(old_found_filtered, found_filtered, current_time - prev_time)
         old_found_filtered = found_filtered
         log(found_filtered)
-        cv2.imwrite(time.ctime() + '.jpg', frame)
+        cv2.imwrite(get_file_name(), frame)
 
     prev_time = current_time
 
-    cv2.imshow('frame', gray)
+    cv2.imshow('frame', frame)
     if cv2.waitKey(30) & 0xFF == ord('q'):
         break
 
