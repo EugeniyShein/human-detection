@@ -1,10 +1,11 @@
 import numpy as np
 import cv2
-import csv
 import time
 import math
 import itertools
 import os
+
+from Logger import Logger
 
 localtime = time.localtime()
 timeString = time.strftime("%Y%m%d%H%M%S", localtime)
@@ -20,9 +21,7 @@ directory = './' + timeString + '/'
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-myfile = open(directory + "data.csv", 'wb')
-wr = csv.writer(myfile, delimiter='|', quoting=csv.QUOTE_ALL)
-
+logger = Logger(directory)
 
 def calculate_speed(old_found_filtered, found_filtered, timestemp):
     if len(old_found_filtered) > 0:
@@ -50,9 +49,7 @@ def sort_nearest(found_filtered):
 def log(found_filtered):
     current_time = time.ctime()
     for r in itertools.product(found_filtered, found_speed):
-        wr.writerow([current_time, r[0], r[1]])
-        myfile.flush()
-
+        logger.write_log(current_time, r)
 
 def calc_speed_by_two(rectangles, timestemp):
     x1, y1 = get_rectangles_coordinates(rectangles[0])
@@ -131,4 +128,4 @@ while (True):
 # When everything done, release the capture
 cap.release()
 cv2.destroyAllWindows()
-myfile.close()
+logger.close()
