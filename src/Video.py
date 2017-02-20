@@ -16,8 +16,12 @@ if not os.path.exists(directory):
 
 logger = Logger(directory)
 
-cap = cv2.VideoCapture("../SecurityCameraMomentsOfAllTime.mp4")
-image_processor = Processor()
+cap = cv2.VideoCapture("../IMG_0075.mp4")
+width = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+height = int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+fps = cap.get(cv2.cv.CV_CAP_PROP_FPS)
+
+image_processor = Processor(width, height, fps)
 
 size = (int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT)))
 
