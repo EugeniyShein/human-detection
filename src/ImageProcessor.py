@@ -32,7 +32,9 @@ def filter_inside(found, screen_area):
                 break
         else:
             found_filtered.append(r)
-    return found_filtered
+
+    merged = merge_bounds(found_filtered)
+    return merged
 
 
 def merge_bounds(mseg_bounds):
@@ -44,12 +46,14 @@ def merge_bounds(mseg_bounds):
         rect = get_biggest_rect(mseg_bounds_copy)
         remove_rect_from_list(mseg_bounds_copy, rect)
         result_rect = rect.copy()
+
         for r in mseg_bounds_copy[:]:
             if is_close_rect(rect, r):
                 operated += 1
                 remove_rect_from_list(mseg_bounds_copy, r)
+                result_rect = merge_rect(result_rect, r)
 
-
+        bounds.append(result_rect)
     return bounds
 
 
@@ -67,15 +71,21 @@ def get_biggest_rect(mseg_bounds):
 def is_close_rect(rect, smaller_rect):
     rx, ry, rw, rh = rect
     dist = calculate_distance_for_rect(rect, smaller_rect)
-    diagonal = (rw ** 2 - rh ** 2) ** 0.5
-    return dist < (diagonal * 1.25)
+    w2 = float(rw) ** 2.0
+    h2 = float(rh) ** 2.0
+    diagonal = (max(w2, h2) - min(w2, h2)) ** 0.5
+    return dist < diagonal * 1.25
 
 
 def merge_rect(rect_a, rect_b):
     rx, ry, rw, rh = rect_a
     qx, qy, qw, qh = rect_b
-
-
+    x = int((rx + qx) / 2)
+    y = int((ry + qy) / 2)
+    w = int(max(rx, qx) - min(rx, qx) + rw / 2.0 + qw / 2.0)
+    h = int(max(ry, qy) - min(ry, qy) + rh / 2.0 + qh / 2.0)
+    rect = x, y, w, h
+    return rect
 
 
 def inside(r, q):
@@ -202,7 +212,6 @@ class Processor:
 
         people, visible = self.calculator.get_visible()
         draw_detections(display, visible, 3)
-        draw_detections(display, mseg_bounds, 6)
         return display, people
 
     def track_human(self, frame, mseg_bounds):
@@ -230,9 +239,20 @@ class SpeedCalculator:
         for rect in operated_rects[:]:
             for human in operated_list[:]:
                 if human.is_same_human(rect):
+                    human.authorised = True
                     operated_list.remove(human)
                     human.set_new_rect(rect)
                     remove_rect_from_list(operated_rects, rect)
+                    new_list.append(human)
+                    break
+
+        bounds = mseg_bounds[:]
+        for rect in bounds[:]:
+            for human in operated_list[:]:
+                if human.is_same_human(rect):
+                    operated_list.remove(human)
+                    human.set_new_rect(rect)
+                    remove_rect_from_list(operated_rects, bounds)
                     new_list.append(human)
                     break
 
@@ -241,6 +261,11 @@ class SpeedCalculator:
                 new_list.append(human)
 
         for rect in operated_rects:
+            human = Human(rect)
+            human.authorised = True
+            new_list.append(human)
+
+        for rect in bounds:
             new_list.append(Human(rect))
 
         self.found_people = new_list
@@ -263,21 +288,24 @@ class Human:
         self.frames = 1
         self.authorised = False
 
-    def set_authorised(self, authorised):
-        self.authorised = authorised
-
     def set_new_rect(self, rect):
         self.frames += 1
         current_time = time.time()
         self.found_speed = calc_speed_by_two(self.rect, rect, current_time - self.detect_time)
         self.detect_time = current_time
-        self.rect = rect
+        if not self.authorised:
+            self.rect = rect
+        else:
+            x, y, width, height = rect
+            qx, qy, qw, qh = self.rect
+            self.rect = x, y, max(qw, width), max(height, qh)
+
         self.frames += 1
 
     def not_found(self):
-        self.frames = 0
         self.found_speed = 0.0
-        return time.time() - self.detect_time > HUMAN_SECONDS_TO_LIVE
+        self.frames = 0
+        return not self.authorised and time.time() - self.detect_time > HUMAN_SECONDS_TO_LIVE
 
     def get_coordinates(self):
         return get_center_coordinates(self.rect)
